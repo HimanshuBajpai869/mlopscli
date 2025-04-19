@@ -11,7 +11,7 @@ steps:
   - name: train
     script: scripts/train/train.py
     requirements: scripts/train/requirements.txt
-    depends_on: [features_data_prep]
+    depends_on: [features_data_prep, groundtruth_data_prep]
 
   - name: evaluate
     script: scripts/evaluate/evaluate.py

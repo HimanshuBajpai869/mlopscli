@@ -2,7 +2,27 @@
 import subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+from threading import Thread
 import networkx as nx
+import psutil, time
+
+
+def monitor_process(proc, metrics):
+    p = psutil.Process(proc.pid)
+    mem_usage = []
+    cpu_usage = []
+
+    while proc.poll() is None:
+        try:
+            mem = p.memory_info().rss / (1024 * 1024)  # in MB
+            cpu = p.cpu_percent(interval=0.2)
+            mem_usage.append(mem)
+            cpu_usage.append(cpu)
+        except psutil.NoSuchProcess:
+            break
+
+    metrics["memory"] = mem_usage
+    metrics["cpu"] = cpu_usage
 
 
 def setup_virtualenv(step_name: str, requirements_path: str):
@@ -44,12 +64,13 @@ def build_dependency_graph(steps_dict):
     return G
 
 
-def execute_scripts(steps_dict, max_workers=4):
+def execute_scripts(steps_dict, max_workers=4, observe=False):
     G = build_dependency_graph(steps_dict)
     completed = set()
     running_futures = {}
 
-    def run_step(step_name):
+    def run_step(step_name, observe):
+        start = time.time()
         step = steps_dict[step_name]
         name = step["name"]
         script = step["script"]
@@ -62,16 +83,35 @@ def execute_scripts(steps_dict, max_workers=4):
 
         python_exe = setup_virtualenv(name, requirements)
 
-        result = subprocess.run(
-            [str(python_exe), str(script_path)],
-            capture_output=True,
-            text=True,
-        )
+        if observe:
+            metrics = {}
+            result = subprocess.Popen([str(python_exe), str(script_path)])
+            monitor = Thread(target=monitor_process, args=(result, metrics))
+            monitor.start()
+            result.wait()
+            monitor.join()
+        else:
+            result = subprocess.run(
+                [str(python_exe), str(script_path)],
+                capture_output=True,
+                text=True,
+            )
+
+        end = time.time()
+        duration = end - start
 
         if result.returncode != 0:
             raise RuntimeError(f"❌ Step '{name}' failed:\n{result.stderr}")
-        print(f"✅ Step '{name}' completed.")
-        print(result.stdout)
+
+        print(f"✅ Step '{name}' completed in {duration:.2f}s")
+
+        if observe:
+            peak_mem = max(metrics["memory"]) if metrics["memory"] else 0
+            avg_cpu = sum(metrics["cpu"]) / len(metrics["cpu"]) if metrics["cpu"] else 0
+            print(f"🧠 Peak memory: {peak_mem:.2f} MB")
+            print(f"⚙️ Avg CPU: {avg_cpu:.2f}%")
+        else:
+            print(result.stdout)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         while len(completed) < len(G.nodes):
@@ -86,7 +126,7 @@ def execute_scripts(steps_dict, max_workers=4):
 
             # Submit new ready steps
             for step_name in ready_steps:
-                future = executor.submit(run_step, step_name)
+                future = executor.submit(run_step, step_name, observe)
                 running_futures[future] = step_name
 
             if not running_futures:

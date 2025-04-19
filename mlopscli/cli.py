@@ -1,7 +1,7 @@
 # mlopscli/cli.py
 import typer
 from pathlib import Path
-from mlopscli.runner import run_pipeline
+from mlopscli.runner import run_pipeline, dry_run_pipeline
 import shutil
 
 app = typer.Typer()
@@ -16,10 +16,13 @@ def execute(
     render_dag: bool = typer.Option(
         True, "--render_dag/--no-render_dag", help="Render DAG to image"
     ),
+    observe: bool = typer.Option(
+        False, "--observe", help="Enable compute usage tracking per step"
+    ),
 ):
     """Runs the jobs as a pipeline and renders DAG if requested."""
     typer.echo(f"Running job: {job_name}")
-    run_pipeline(job_name, job_config, render_dag)
+    run_pipeline(job_name, job_config, render_dag, observe)
 
 
 @app.command()
@@ -47,6 +50,18 @@ def cleanup(step_name: str = None, all: bool = False):
         print(
             "❌ Please provide either a step name or use the '--all' flag to clean all environments."
         )
+
+
+@app.command()
+def dry_run(
+    job_name: str = typer.Option(
+        ..., "--job", help="Job name (e.g., prepare_train_pipeline)"
+    ),
+    job_config: Path = typer.Option(..., "--job_config", help="Path to job_order.yaml"),
+):
+    """Simulate running the jobs and show the execution flow without actually running them."""
+    typer.echo(f"Simulating job: {job_name}")
+    dry_run_pipeline(job_name, job_config)
 
 
 if __name__ == "__main__":
