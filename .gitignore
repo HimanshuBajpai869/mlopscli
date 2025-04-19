@@ -3,3 +3,4 @@ cli_env/
 __pycache__
 .mlopscli_envs
 dist
+.DS_Store
