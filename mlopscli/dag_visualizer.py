@@ -2,12 +2,12 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from pathlib import Path
-import time
+from mlopscli.constants import ARTIFACTS_DIRECTORY
 
 
 def visualize_dag(pipeline_name: str, steps: dict, output_path=None):
     if output_path is None:
-        output_path = f"mlops_artifacts/{time.time()}/{pipeline_name}_dag.png"
+        output_path = f"{ARTIFACTS_DIRECTORY}/{pipeline_name}_dag.png"
 
     # Ensure output directory exists
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
