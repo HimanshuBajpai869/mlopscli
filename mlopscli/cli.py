@@ -64,5 +64,13 @@ def dry_run(
     dry_run_pipeline(job_name, job_config)
 
 
+@app.command()
+def dashboard():
+    """Launch the MLOps dashboard to monitor submitted jobs."""
+    import subprocess
+
+    subprocess.run(["streamlit", "run", "dashboard/dashboard.py"])
+
+
 if __name__ == "__main__":
     app()
