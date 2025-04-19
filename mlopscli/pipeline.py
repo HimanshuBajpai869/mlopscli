@@ -1,34 +1,8 @@
 # mlopscli/pipeline.py
 import subprocess
 from pathlib import Path
-
-
-def topological_sort(steps: dict):
-    from collections import defaultdict, deque
-
-    graph = defaultdict(list)
-    indegree = defaultdict(int)
-
-    for name, step in steps.items():
-        for dep in step.get("depends_on", []):
-            graph[dep].append(name)
-            indegree[name] += 1
-
-    queue = deque([name for name in steps if indegree[name] == 0])
-    sorted_steps = []
-
-    while queue:
-        node = queue.popleft()
-        sorted_steps.append(steps[node])
-        for neighbor in graph[node]:
-            indegree[neighbor] -= 1
-            if indegree[neighbor] == 0:
-                queue.append(neighbor)
-
-    if len(sorted_steps) != len(steps):
-        raise ValueError("Cycle detected in job dependencies!")
-
-    return sorted_steps
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
+import networkx as nx
 
 
 def setup_virtualenv(step_name: str, requirements_path: str):
@@ -61,35 +35,71 @@ def setup_virtualenv(step_name: str, requirements_path: str):
     return python_bin
 
 
-def execute_scripts(steps_dict):
-    """Execute the job steps in the correct order (topologically sorted)."""
-    sorted_steps = topological_sort(steps_dict)
+def build_dependency_graph(steps_dict):
+    G = nx.DiGraph()
+    for step_name, step_info in steps_dict.items():
+        G.add_node(step_name, info=step_info)
+        for dep in step_info.get("depends_on", []):
+            G.add_edge(dep, step_name)
+    return G
 
-    for step in sorted_steps:
+
+def execute_scripts(steps_dict, max_workers=4):
+    G = build_dependency_graph(steps_dict)
+    completed = set()
+    running_futures = {}
+
+    def run_step(step_name):
+        step = steps_dict[step_name]
         name = step["name"]
         script = step["script"]
         requirements = step.get("requirements")
 
         print(f"\n🔧 Running step: {name} ({script})")
-
-        # Check if the script exists
         script_path = Path(script)
         if not script_path.exists():
             raise FileNotFoundError(f"❌ Script not found: {script_path.resolve()}")
 
-        # Set up the virtual environment for this step and get the python executable
         python_exe = setup_virtualenv(name, requirements)
 
-        # Run the script in the virtual environment
         result = subprocess.run(
-            [str(python_exe), str(script_path)], capture_output=True, text=True
+            [str(python_exe), str(script_path)],
+            capture_output=True,
+            text=True,
         )
 
-        # Handle the result
         if result.returncode != 0:
-            print(f"❌ Step '{name}' failed.")
-            print(result.stderr)
-            break
-        else:
-            print(f"✅ Step '{name}' completed.")
-            print(result.stdout)
+            raise RuntimeError(f"❌ Step '{name}' failed:\n{result.stderr}")
+        print(f"✅ Step '{name}' completed.")
+        print(result.stdout)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        while len(completed) < len(G.nodes):
+            # Get new ready steps (not completed, not already running)
+            ready_steps = [
+                node
+                for node in G.nodes
+                if node not in completed
+                and node not in running_futures.values()
+                and all(pred in completed for pred in G.predecessors(node))
+            ]
+
+            # Submit new ready steps
+            for step_name in ready_steps:
+                future = executor.submit(run_step, step_name)
+                running_futures[future] = step_name
+
+            if not running_futures:
+                raise RuntimeError("⚠️ Deadlock detected or no runnable steps found.")
+
+            # Process completed futures
+            done, _ = wait(running_futures.keys(), return_when=FIRST_COMPLETED)
+            for future in done:
+                step_name = running_futures.pop(future)
+                try:
+                    future.result()
+                    completed.add(step_name)
+                except Exception as e:
+                    print(f"❌ Error in step '{step_name}': {e}")
+                    executor.shutdown(wait=False)
+                    return  # Exit early on error
