@@ -15,4 +15,5 @@ steps:
 
   - name: evaluate
     script: scripts/evaluate/evaluate.py
+    requirements: scripts/evaluate/requirements.txt
     depends_on: [train]

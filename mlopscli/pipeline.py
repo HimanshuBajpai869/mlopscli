@@ -108,8 +108,8 @@ def execute_scripts(steps_dict, max_workers=4, observe=False):
         if observe:
             peak_mem = max(metrics["memory"]) if metrics["memory"] else 0
             avg_cpu = sum(metrics["cpu"]) / len(metrics["cpu"]) if metrics["cpu"] else 0
-            print(f"🧠 Peak memory: {peak_mem:.2f} MB")
-            print(f"⚙️ Avg CPU: {avg_cpu:.2f}%")
+            print(f"🧠 Peak memory for step {name}: {peak_mem:.2f} MB")
+            print(f"⚙️ Avg CPU for step {name}: {avg_cpu:.2f}%")
         else:
             print(result.stdout)
 
