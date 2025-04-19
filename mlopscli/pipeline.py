@@ -4,7 +4,16 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from threading import Thread
 import networkx as nx
-import psutil, time
+import psutil, time, json
+from mlopscli.constants import ARTIFACTS_DIRECTORY
+
+
+def write_metadata(run_dir, job_name, steps, timestamp):
+    """Writes the metadata to a JSON file in the run directory."""
+    metadata = {"job_name": job_name, "timestamp": timestamp, "steps": steps}
+    metadata_path = run_dir / "metadata.json"
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=4)
 
 
 def monitor_process(proc, metrics):
@@ -64,10 +73,14 @@ def build_dependency_graph(steps_dict):
     return G
 
 
-def execute_scripts(steps_dict, max_workers=4, observe=False):
+def execute_scripts(job_name, steps_dict, max_workers=4, observe=False):
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%S")
     G = build_dependency_graph(steps_dict)
     completed = set()
     running_futures = {}
+    run_dir = Path(ARTIFACTS_DIRECTORY)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    steps_metadata = []
 
     def run_step(step_name, observe):
         start = time.time()
@@ -99,6 +112,15 @@ def execute_scripts(steps_dict, max_workers=4, observe=False):
 
         end = time.time()
         duration = end - start
+
+        step_metadata = {
+            "name": name,
+            "status": "success" if result.returncode == 0 else "failed",
+            "duration": duration,
+            "script": str(script_path),
+        }
+
+        steps_metadata.append(step_metadata)
 
         if result.returncode != 0:
             raise RuntimeError(f"❌ Step '{name}' failed:\n{result.stderr}")
@@ -143,3 +165,5 @@ def execute_scripts(steps_dict, max_workers=4, observe=False):
                     print(f"❌ Error in step '{step_name}': {e}")
                     executor.shutdown(wait=False)
                     return  # Exit early on error
+
+    write_metadata(run_dir, job_name, steps_metadata, timestamp)

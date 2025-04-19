@@ -75,6 +75,6 @@ def run_pipeline(
     print(f"Starting pipeline: {pipeline_name} under job {job_name}")
 
     if render_dag:
-        visualize_dag(pipeline_name, step_dict)
+        visualize_dag(job_name, step_dict)
 
-    execute_scripts(step_dict, observe=observe)
+    execute_scripts(job_name=job_name, steps_dict=step_dict, observe=observe)
