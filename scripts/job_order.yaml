@@ -2,11 +2,11 @@ pipeline_name: train_pipeline
 steps:
   - name: data_prep
     script: scripts/data_prep/data_prep.py
-    requirements: scripts/data_prep/requirements_data.txt
+    requirements: scripts/data_prep/requirements.txt
 
   - name: train
     script: scripts/train/train.py
-    requirements: scripts/train/requirements_train.txt
+    requirements: scripts/train/requirements.txt
     depends_on: [data_prep]
 
   - name: evaluate

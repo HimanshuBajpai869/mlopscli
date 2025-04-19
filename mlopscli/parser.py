@@ -15,12 +15,21 @@ def load_job_config(config_path: Path):
 
     step_dict = {}
     for step in steps:
+        print(f"Step Details : {step}")
         name = step["name"]
         script = Path(step["script"])
         depends_on = step.get("depends_on", [])
+        requirements = (
+            Path(step.get("requirements")) if step.get("requirements") else None
+        )
 
         if not script.exists():
             raise FileNotFoundError(f"Script not found: {script}")
-        step_dict[name] = {"name": name, "script": script, "depends_on": depends_on}
+        step_dict[name] = {
+            "name": name,
+            "script": script,
+            "depends_on": depends_on,
+            "requirements": requirements,
+        }
 
     return pipeline_name, step_dict
