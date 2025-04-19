@@ -1,4 +1,0 @@
-typer
-pyyaml
-networkx
-matplotlib
