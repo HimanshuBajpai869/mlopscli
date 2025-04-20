@@ -53,6 +53,4 @@ mlopscli cleanup --all
 
 **Quick Demo**
 
-[![Watch the demo](https://img.youtube.com/vi/MFBbSA-SHFU/hqdefault.jpg)](https://www.youtube.com/watch?v=MFBbSA-SHFU)
-
 
