@@ -69,7 +69,7 @@ def dashboard():
     """Launch the MLOps dashboard to monitor submitted jobs."""
     import subprocess
 
-    subprocess.run(["streamlit", "run", "mlopscli/dashboard.py"])
+    subprocess.run(["streamlit", "run", str(Path(__file__).parent / "dashboard.py")])
 
 
 if __name__ == "__main__":
