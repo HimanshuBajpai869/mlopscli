@@ -50,4 +50,6 @@ mlopscli cleanup --all
 
 `--all` : If passed, all the environments are cleaned up.
 
+[![Watch the demo](https://img.youtube.com/vi/MFBbSA-SHFU/hqdefault.jpg)](https://www.youtube.com/watch?v=MFBbSA-SHFU)
+
 
